@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "Get leaderboard",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "users": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Save user progress",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "user": {
+          "id": "test_user_123",
+          "name": "Тестовый игрок",
+          "level": 2,
+          "points": 150,
+          "progress": 50,
+          "gamesPlayed": 5,
+          "totalTime": 25,
+          "subjectProgress": {
+            "Математика": 60,
+            "Русский язык": 40
+          }
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

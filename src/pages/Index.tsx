@@ -56,8 +56,21 @@ const Index = () => {
     } else {
       loadUserProfile(userId);
     }
-    loadAllUsers();
+    loadAllUsersFromCloud();
   }, []);
+
+  const loadAllUsersFromCloud = async () => {
+    try {
+      const response = await fetch('https://functions.poehali.dev/15f277d4-b858-437b-8717-800be323b8d9');
+      const data = await response.json();
+      if (data.users) {
+        setAllUsers(data.users);
+      }
+    } catch (error) {
+      console.error('Failed to load users from cloud:', error);
+      loadAllUsers();
+    }
+  };
 
   const loadUserProfile = (userId: string) => {
     const savedProfile = localStorage.getItem(`school_profile_${userId}`);
@@ -80,7 +93,7 @@ const Index = () => {
     setAllUsers(users.sort((a, b) => b.points - a.points));
   };
 
-  const createUserProfile = () => {
+  const createUserProfile = async () => {
     if (!userName.trim()) {
       toast({
         title: 'Ошибка',
@@ -113,7 +126,19 @@ const Index = () => {
     localStorage.setItem(`school_profile_${userId}`, JSON.stringify(newProfile));
     setUserProfile(newProfile);
     setShowNameDialog(false);
-    loadAllUsers();
+
+    try {
+      await fetch('https://functions.poehali.dev/15f277d4-b858-437b-8717-800be323b8d9', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user: newProfile })
+      });
+      loadAllUsersFromCloud();
+    } catch (error) {
+      console.error('Failed to create user in cloud:', error);
+    }
 
     toast({
       title: '🎉 Добро пожаловать!',
@@ -121,10 +146,22 @@ const Index = () => {
     });
   };
 
-  const saveUserProfile = (updatedProfile: UserProfile) => {
+  const saveUserProfile = async (updatedProfile: UserProfile) => {
     localStorage.setItem(`school_profile_${updatedProfile.id}`, JSON.stringify(updatedProfile));
     setUserProfile(updatedProfile);
-    loadAllUsers();
+    
+    try {
+      await fetch('https://functions.poehali.dev/15f277d4-b858-437b-8717-800be323b8d9', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user: updatedProfile })
+      });
+      loadAllUsersFromCloud();
+    } catch (error) {
+      console.error('Failed to sync user to cloud:', error);
+    }
   };
 
   const updateProgress = (points: number, category: string) => {

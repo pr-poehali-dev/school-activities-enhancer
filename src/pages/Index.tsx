@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
+import GamePlay from '@/components/GamePlay';
+import { useToast } from '@/hooks/use-toast';
 
 interface Game {
   id: string;
@@ -28,6 +30,8 @@ const Index = () => {
   const [userLevel, setUserLevel] = useState(3);
   const [userPoints, setUserPoints] = useState(1250);
   const [userProgress, setUserProgress] = useState(65);
+  const [activeGame, setActiveGame] = useState<Game | null>(null);
+  const { toast } = useToast();
 
   const games: Game[] = [
     {
@@ -265,7 +269,10 @@ const Index = () => {
                     </CardHeader>
                     <CardContent>
                       <p className="text-gray-600 mb-4">{game.description}</p>
-                      <Button className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white shadow-lg">
+                      <Button 
+                        onClick={() => setActiveGame(game)}
+                        className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white shadow-lg"
+                      >
                         <Icon name="Play" className="mr-2" size={18} />
                         Начать игру
                       </Button>
@@ -495,6 +502,32 @@ const Index = () => {
           <p className="text-sm">© 2024 Умная Перемена — Учись играя! 🚀</p>
         </div>
       </footer>
+
+      {activeGame && (
+        <GamePlay
+          gameId={activeGame.id}
+          gameTitle={activeGame.title}
+          gameIcon={activeGame.icon}
+          difficulty={activeGame.difficulty}
+          onClose={() => setActiveGame(null)}
+          onComplete={(points) => {
+            setUserPoints(userPoints + points);
+            const newProgress = ((userPoints + points) % 1000) / 10;
+            setUserProgress(newProgress);
+            if (userPoints + points >= (userLevel * 1000)) {
+              setUserLevel(userLevel + 1);
+              toast({
+                title: "🎉 Новый уровень!",
+                description: `Поздравляем! Ты достиг уровня ${userLevel + 1}!`,
+              });
+            }
+            toast({
+              title: "Отлично!",
+              description: `+${points} очков! Так держать!`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

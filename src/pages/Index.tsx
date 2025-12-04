@@ -44,6 +44,7 @@ const Index = () => {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [activeGame, setActiveGame] = useState<Game | null>(null);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('Все');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -329,7 +330,6 @@ const Index = () => {
     .slice(0, 10);
 
   const categories = ['Все', 'Математика', 'Русский язык', 'Английский', 'География', 'Логика', 'История'];
-  const [selectedCategory, setSelectedCategory] = useState('Все');
 
   const filteredGames = selectedCategory === 'Все' 
     ? games 

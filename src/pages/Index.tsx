@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,13 +25,178 @@ interface Achievement {
   unlocked: boolean;
 }
 
+interface UserProfile {
+  id: string;
+  name: string;
+  level: number;
+  points: number;
+  progress: number;
+  gamesPlayed: number;
+  totalTime: number;
+  achievements: string[];
+  subjectProgress: Record<string, number>;
+}
+
 const Index = () => {
   const [activeTab, setActiveTab] = useState('games');
-  const [userLevel, setUserLevel] = useState(3);
-  const [userPoints, setUserPoints] = useState(1250);
-  const [userProgress, setUserProgress] = useState(65);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userName, setUserName] = useState('');
+  const [showNameDialog, setShowNameDialog] = useState(false);
   const [activeGame, setActiveGame] = useState<Game | null>(null);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const userId = localStorage.getItem('school_userId');
+    if (!userId) {
+      const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('school_userId', newUserId);
+      setShowNameDialog(true);
+    } else {
+      loadUserProfile(userId);
+    }
+    loadAllUsers();
+  }, []);
+
+  const loadUserProfile = (userId: string) => {
+    const savedProfile = localStorage.getItem(`school_profile_${userId}`);
+    if (savedProfile) {
+      setUserProfile(JSON.parse(savedProfile));
+    } else {
+      setShowNameDialog(true);
+    }
+  };
+
+  const loadAllUsers = () => {
+    const users: UserProfile[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('school_profile_')) {
+        const profile = JSON.parse(localStorage.getItem(key)!);
+        users.push(profile);
+      }
+    }
+    setAllUsers(users.sort((a, b) => b.points - a.points));
+  };
+
+  const createUserProfile = () => {
+    if (!userName.trim()) {
+      toast({
+        title: 'Ошибка',
+        description: 'Введи своё имя!',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const userId = localStorage.getItem('school_userId')!;
+    const newProfile: UserProfile = {
+      id: userId,
+      name: userName.trim(),
+      level: 1,
+      points: 0,
+      progress: 0,
+      gamesPlayed: 0,
+      totalTime: 0,
+      achievements: [],
+      subjectProgress: {
+        'Математика': 0,
+        'Русский язык': 0,
+        'Английский': 0,
+        'География': 0,
+        'Логика': 0,
+        'История': 0
+      }
+    };
+
+    localStorage.setItem(`school_profile_${userId}`, JSON.stringify(newProfile));
+    setUserProfile(newProfile);
+    setShowNameDialog(false);
+    loadAllUsers();
+
+    toast({
+      title: '🎉 Добро пожаловать!',
+      description: `Привет, ${userName}! Начни играть и зарабатывай очки!`
+    });
+  };
+
+  const saveUserProfile = (updatedProfile: UserProfile) => {
+    localStorage.setItem(`school_profile_${updatedProfile.id}`, JSON.stringify(updatedProfile));
+    setUserProfile(updatedProfile);
+    loadAllUsers();
+  };
+
+  const updateProgress = (points: number, category: string) => {
+    if (!userProfile) return;
+
+    const newPoints = userProfile.points + points;
+    const pointsForNextLevel = userProfile.level * 500;
+    const newProgress = ((newPoints % pointsForNextLevel) / pointsForNextLevel) * 100;
+    let newLevel = userProfile.level;
+
+    if (newPoints >= pointsForNextLevel) {
+      newLevel = Math.floor(newPoints / 500) + 1;
+      toast({
+        title: '🎉 Новый уровень!',
+        description: `Поздравляем! Ты достиг уровня ${newLevel}!`
+      });
+    }
+
+    const categoryProgress = userProfile.subjectProgress[category] || 0;
+    const newCategoryProgress = Math.min(100, categoryProgress + (points / 10));
+
+    const updatedProfile: UserProfile = {
+      ...userProfile,
+      points: newPoints,
+      level: newLevel,
+      progress: newProgress,
+      gamesPlayed: userProfile.gamesPlayed + 1,
+      totalTime: userProfile.totalTime + 5,
+      subjectProgress: {
+        ...userProfile.subjectProgress,
+        [category]: newCategoryProgress
+      }
+    };
+
+    saveUserProfile(updatedProfile);
+  };
+
+  if (showNameDialog) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full animate-scale-in shadow-2xl">
+          <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white text-center">
+            <div className="text-6xl mb-4">👋</div>
+            <CardTitle className="text-3xl">Добро пожаловать!</CardTitle>
+            <CardDescription className="text-purple-50">Введи своё имя, чтобы начать</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Как тебя зовут?</label>
+              <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && createUserProfile()}
+                placeholder="Например: Аня или Максим"
+                className="w-full px-4 py-3 rounded-xl border-2 border-purple-200 focus:border-purple-500 focus:outline-none text-lg"
+                autoFocus
+              />
+            </div>
+            <Button
+              onClick={createUserProfile}
+              className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white text-lg py-6"
+            >
+              <Icon name="Sparkles" className="mr-2" size={20} />
+              Начать играть!
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!userProfile) return null;
 
   const games: Game[] = [
     {
@@ -153,13 +318,15 @@ const Index = () => {
     { id: '6', title: 'Чемпион', icon: '🏆', unlocked: false }
   ];
 
-  const leaderboard = [
-    { rank: 1, name: 'Анна К.', points: 3500, level: 8 },
-    { rank: 2, name: 'Максим Л.', points: 3200, level: 7 },
-    { rank: 3, name: 'София М.', points: 2800, level: 7 },
-    { rank: 4, name: 'Ты', points: userPoints, level: userLevel },
-    { rank: 5, name: 'Дмитрий П.', points: 1100, level: 3 }
-  ];
+  const leaderboard = allUsers
+    .map((user, index) => ({
+      rank: index + 1,
+      name: user.id === userProfile.id ? `${user.name} (Ты)` : user.name,
+      points: user.points,
+      level: user.level,
+      isCurrentUser: user.id === userProfile.id
+    }))
+    .slice(0, 10);
 
   const categories = ['Все', 'Математика', 'Русский язык', 'Английский', 'География', 'Логика', 'История'];
   const [selectedCategory, setSelectedCategory] = useState('Все');
@@ -192,11 +359,14 @@ const Index = () => {
             <div className="flex items-center gap-4">
               <div className="hidden md:flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 rounded-full">
                 <Icon name="Trophy" className="text-yellow-600" size={20} />
-                <span className="font-semibold text-purple-700">{userPoints} очков</span>
+                <span className="font-semibold text-purple-700">{userProfile.points} очков</span>
               </div>
               <div className="flex items-center gap-2 bg-gradient-to-r from-blue-100 to-cyan-100 px-4 py-2 rounded-full">
                 <Icon name="Star" className="text-blue-600" size={20} />
-                <span className="font-semibold text-blue-700">Уровень {userLevel}</span>
+                <span className="font-semibold text-blue-700">Уровень {userProfile.level}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-gradient-to-r from-green-100 to-emerald-100 px-3 py-2 rounded-full">
+                <span className="font-semibold text-green-700">{userProfile.name}</span>
               </div>
             </div>
           </div>
@@ -331,7 +501,7 @@ const Index = () => {
                     <div
                       key={player.rank}
                       className={`flex items-center justify-between p-4 rounded-xl transition-all hover:scale-102 animate-slide-up ${
-                        player.name === 'Ты'
+                        player.isCurrentUser
                           ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-2 border-purple-400 shadow-lg'
                           : 'bg-white border-2 border-gray-100 hover:border-blue-300'
                       }`}
@@ -378,45 +548,39 @@ const Index = () => {
                 <div className="bg-gradient-to-r from-purple-100 to-pink-100 p-6 rounded-2xl">
                   <div className="flex items-center justify-between mb-3">
                     <span className="font-semibold text-lg">До следующего уровня</span>
-                    <span className="text-2xl font-bold text-purple-600">{userProgress}%</span>
+                    <span className="text-2xl font-bold text-purple-600">{Math.round(userProfile.progress)}%</span>
                   </div>
-                  <Progress value={userProgress} className="h-4" />
-                  <p className="text-sm text-gray-600 mt-2">Ещё 350 очков до уровня {userLevel + 1}!</p>
+                  <Progress value={userProfile.progress} className="h-4" />
+                  <p className="text-sm text-gray-600 mt-2">Ещё {(userProfile.level * 500) - userProfile.points} очков до уровня {userProfile.level + 1}!</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-6 rounded-2xl text-center animate-bounce-in">
                     <Icon name="Flame" className="mx-auto text-orange-500 mb-2" size={36} />
-                    <p className="text-3xl font-bold text-blue-700">7</p>
+                    <p className="text-3xl font-bold text-blue-700">{Math.floor(userProfile.gamesPlayed / 3) || 1}</p>
                     <p className="text-sm text-gray-700">дней подряд</p>
                   </div>
                   <div className="bg-gradient-to-br from-green-100 to-green-200 p-6 rounded-2xl text-center animate-bounce-in" style={{ animationDelay: '0.1s' }}>
                     <Icon name="CheckCircle2" className="mx-auto text-green-600 mb-2" size={36} />
-                    <p className="text-3xl font-bold text-green-700">23</p>
+                    <p className="text-3xl font-bold text-green-700">{userProfile.gamesPlayed}</p>
                     <p className="text-sm text-gray-700">игры пройдено</p>
                   </div>
                   <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-6 rounded-2xl text-center animate-bounce-in" style={{ animationDelay: '0.2s' }}>
                     <Icon name="Clock" className="mx-auto text-purple-600 mb-2" size={36} />
-                    <p className="text-3xl font-bold text-purple-700">12ч</p>
+                    <p className="text-3xl font-bold text-purple-700">{Math.floor(userProfile.totalTime / 60)}ч</p>
                     <p className="text-sm text-gray-700">время обучения</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <h3 className="font-semibold text-lg mb-4">Прогресс по предметам</h3>
-                  {[
-                    { subject: 'Математика', progress: 80, color: 'purple' },
-                    { subject: 'Русский язык', progress: 65, color: 'orange' },
-                    { subject: 'Английский', progress: 50, color: 'blue' },
-                    { subject: 'География', progress: 40, color: 'green' },
-                    { subject: 'Логика', progress: 70, color: 'pink' }
-                  ].map((item, index) => (
-                    <div key={item.subject} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+                  {Object.entries(userProfile.subjectProgress).map(([subject, progress], index) => (
+                    <div key={subject} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
                       <div className="flex justify-between mb-2">
-                        <span className="font-medium">{item.subject}</span>
-                        <span className="text-sm text-gray-600">{item.progress}%</span>
+                        <span className="font-medium">{subject}</span>
+                        <span className="text-sm text-gray-600">{Math.round(progress)}%</span>
                       </div>
-                      <Progress value={item.progress} className={`h-3 [&>div]:bg-${item.color}-500`} />
+                      <Progress value={progress} className="h-3" />
                     </div>
                   ))}
                 </div>
@@ -511,20 +675,12 @@ const Index = () => {
           difficulty={activeGame.difficulty}
           onClose={() => setActiveGame(null)}
           onComplete={(points) => {
-            setUserPoints(userPoints + points);
-            const newProgress = ((userPoints + points) % 1000) / 10;
-            setUserProgress(newProgress);
-            if (userPoints + points >= (userLevel * 1000)) {
-              setUserLevel(userLevel + 1);
-              toast({
-                title: "🎉 Новый уровень!",
-                description: `Поздравляем! Ты достиг уровня ${userLevel + 1}!`,
-              });
-            }
+            updateProgress(points, activeGame.category);
             toast({
               title: "Отлично!",
               description: `+${points} очков! Так держать!`,
             });
+            setActiveGame(null);
           }}
         />
       )}
